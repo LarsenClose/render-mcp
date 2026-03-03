@@ -13,8 +13,12 @@ export async function handleRenderImage(args: Record<string, unknown>) {
   const ext = extname(path).toLowerCase();
 
   if (!SUPPORTED_IMAGE_EXTENSIONS.has(ext)) {
+    const hint =
+      ext === ".svg"
+        ? " SVGs are not supported by the Anthropic API as image blocks. Use render_html to rasterize SVGs instead."
+        : "";
     throw new Error(
-      `Unsupported image format '${ext}'. Supported: ${[...SUPPORTED_IMAGE_EXTENSIONS].join(", ")}`,
+      `Unsupported image format '${ext}'. Supported: ${[...SUPPORTED_IMAGE_EXTENSIONS].join(", ")}.${hint}`,
     );
   }
 

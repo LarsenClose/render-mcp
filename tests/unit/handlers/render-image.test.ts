@@ -27,6 +27,12 @@ describe("handleRenderImage", () => {
     );
   });
 
+  it("throws on SVG with helpful message", async () => {
+    await expect(handleRenderImage({ path: "/tmp/icon.svg" })).rejects.toThrow(
+      /Use render_html to rasterize SVGs/,
+    );
+  });
+
   it("throws on file not found", async () => {
     await expect(
       handleRenderImage({ path: "/nonexistent/test.png" }),
@@ -34,15 +40,8 @@ describe("handleRenderImage", () => {
   });
 
   it("supports JPEG files", async () => {
-    // The handler validates extension before reading, so this tests the extension check
     await expect(
       handleRenderImage({ path: "/nonexistent/photo.jpg" }),
-    ).rejects.not.toThrow(/Unsupported/);
-  });
-
-  it("supports SVG files", async () => {
-    await expect(
-      handleRenderImage({ path: "/nonexistent/icon.svg" }),
     ).rejects.not.toThrow(/Unsupported/);
   });
 
@@ -65,7 +64,7 @@ describe("handleRenderImage", () => {
       await unlink(oversizedPath).catch(() => {});
     });
 
-    it("blocks files exceeding 20 MB with isError response", async () => {
+    it("blocks files exceeding limit with isError response", async () => {
       // Create a file just over the limit with a valid PNG header
       const pngHeader = Buffer.from([
         0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,

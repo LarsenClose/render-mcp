@@ -1,7 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline";
+import { writeFile, unlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { MAX_OUTPUT_BYTES } from "../../src/types.js";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 
@@ -41,11 +44,34 @@ function collectResponse(
   });
 }
 
+function spawnServer() {
+  return spawn("node", [resolve(ROOT, "dist/index.js")], {
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+}
+
+async function initializeServer(proc: ReturnType<typeof spawn>) {
+  sendJsonRpc(proc, {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: {
+      protocolVersion: "2024-11-05",
+      capabilities: {},
+      clientInfo: { name: "e2e-test", version: "1.0" },
+    },
+  });
+  await collectResponse(proc);
+
+  sendJsonRpc(proc, {
+    jsonrpc: "2.0",
+    method: "notifications/initialized",
+  });
+}
+
 describe("E2E stdio transport", () => {
   it("completes initialize handshake", async () => {
-    const proc = spawn("node", [resolve(ROOT, "dist/index.js")], {
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    const proc = spawnServer();
 
     try {
       sendJsonRpc(proc, {
@@ -72,31 +98,11 @@ describe("E2E stdio transport", () => {
   });
 
   it("lists tools after initialization", async () => {
-    const proc = spawn("node", [resolve(ROOT, "dist/index.js")], {
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    const proc = spawnServer();
 
     try {
-      // Initialize
-      sendJsonRpc(proc, {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "initialize",
-        params: {
-          protocolVersion: "2024-11-05",
-          capabilities: {},
-          clientInfo: { name: "e2e-test", version: "1.0" },
-        },
-      });
-      await collectResponse(proc);
+      await initializeServer(proc);
 
-      // Send initialized notification
-      sendJsonRpc(proc, {
-        jsonrpc: "2.0",
-        method: "notifications/initialized",
-      });
-
-      // List tools
       sendJsonRpc(proc, {
         jsonrpc: "2.0",
         id: 2,
@@ -122,30 +128,11 @@ describe("E2E stdio transport", () => {
   });
 
   it("executes render_image tool call", async () => {
-    const proc = spawn("node", [resolve(ROOT, "dist/index.js")], {
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    const proc = spawnServer();
 
     try {
-      // Initialize
-      sendJsonRpc(proc, {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "initialize",
-        params: {
-          protocolVersion: "2024-11-05",
-          capabilities: {},
-          clientInfo: { name: "e2e-test", version: "1.0" },
-        },
-      });
-      await collectResponse(proc);
+      await initializeServer(proc);
 
-      sendJsonRpc(proc, {
-        jsonrpc: "2.0",
-        method: "notifications/initialized",
-      });
-
-      // Call render_image
       sendJsonRpc(proc, {
         jsonrpc: "2.0",
         id: 3,
@@ -168,5 +155,55 @@ describe("E2E stdio transport", () => {
       proc.stdin!.end();
       proc.kill();
     }
+  });
+
+  describe("output size guard (E2E)", () => {
+    const oversizedPath = resolve(tmpdir(), "render-mcp-e2e-oversized.png");
+
+    afterEach(async () => {
+      await unlink(oversizedPath).catch(() => {});
+    });
+
+    it("blocks oversized files over stdio with text error", async () => {
+      // Create a file over the 3.5 MB limit
+      const pngHeader = Buffer.from([
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      ]);
+      const padding = Buffer.alloc(MAX_OUTPUT_BYTES + 1 - pngHeader.length);
+      await writeFile(oversizedPath, Buffer.concat([pngHeader, padding]));
+
+      const proc = spawnServer();
+      try {
+        await initializeServer(proc);
+
+        sendJsonRpc(proc, {
+          jsonrpc: "2.0",
+          id: 10,
+          method: "tools/call",
+          params: {
+            name: "render_image",
+            arguments: { path: oversizedPath },
+          },
+        });
+
+        const response = await collectResponse(proc);
+        expect(response.id).toBe(10);
+        const result = response.result as Record<string, unknown>;
+        const content = result.content as Array<Record<string, unknown>>;
+
+        // Must be text error, not image blob
+        expect(result.isError).toBe(true);
+        expect(content[0].type).toBe("text");
+        expect(content[0].type).not.toBe("image");
+        expect(content[0].text).toContain("too large");
+
+        // The response line itself must be small (not a multi-MB base64 blob)
+        const responseJson = JSON.stringify(response);
+        expect(responseJson.length).toBeLessThan(1024);
+      } finally {
+        proc.stdin!.end();
+        proc.kill();
+      }
+    });
   });
 });

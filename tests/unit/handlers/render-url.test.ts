@@ -23,9 +23,10 @@ describe("handleRenderUrl", () => {
 
     expect(result.content).toHaveLength(1);
     expect(result.content[0].type).toBe("image");
-    expect(result.content[0].mimeType).toBe("image/png");
+    expect(result.content[0].mimeType).toBe("image/jpeg");
     const buf = Buffer.from(result.content[0].data, "base64");
-    expect(buf[0]).toBe(0x89); // PNG magic
+    expect(buf[0]).toBe(0xff); // JPEG magic (SOI marker)
+    expect(buf[1]).toBe(0xd8);
   });
 
   it("rejects invalid URL", async () => {

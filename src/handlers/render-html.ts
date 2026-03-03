@@ -23,7 +23,8 @@ export async function handleRenderHtml(
 
     const screenshot = await page.screenshot({
       fullPage,
-      type: "png",
+      type: "jpeg",
+      quality: 80,
     });
 
     const source = parsed.html != null ? "HTML string" : parsed.path!;
@@ -35,7 +36,7 @@ export async function handleRenderHtml(
         {
           type: "image" as const,
           data: screenshot.toString("base64"),
-          mimeType: "image/png",
+          mimeType: "image/jpeg",
         },
       ],
     };

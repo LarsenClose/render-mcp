@@ -77,13 +77,15 @@ export const RenderImageSchema = z.object({
 });
 export type RenderImageInput = z.infer<typeof RenderImageSchema>;
 
+/** Image formats accepted by the Anthropic API as image content blocks.
+ *  SVG (image/svg+xml) is intentionally excluded -- the API rejects it.
+ *  Use render_html to rasterize SVGs instead. */
 export const SUPPORTED_IMAGE_EXTENSIONS = new Set([
   ".png",
   ".jpg",
   ".jpeg",
   ".gif",
   ".webp",
-  ".svg",
 ]);
 
 export const EXTENSION_TO_MIME: Record<string, string> = {
@@ -92,12 +94,13 @@ export const EXTENSION_TO_MIME: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".gif": "image/gif",
   ".webp": "image/webp",
-  ".svg": "image/svg+xml",
 };
 
-/** Maximum output size in bytes (20 MB). Buffers exceeding this are rejected
- *  with a text error so the response never bloats the context window. */
-export const MAX_OUTPUT_BYTES = 20 * 1024 * 1024;
+/** Maximum output size in bytes. The Anthropic API rejects base64 image
+ *  content blocks larger than 5 MB. Since base64 inflates by ~33%, we cap
+ *  raw output at 3.5 MB (~4.67 MB base64) to stay safely under the limit.
+ *  Claude Code does NOT resize MCP tool images -- the burden is on us. */
+export const MAX_OUTPUT_BYTES = 3.5 * 1024 * 1024;
 
 /** Format bytes as a human-readable string. */
 function formatBytes(bytes: number): string {

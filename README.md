@@ -5,24 +5,26 @@
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org/)
 [![MCP SDK](https://img.shields.io/badge/MCP%20SDK-1.27-purple.svg)](https://modelcontextprotocol.io/)
 
-A [Model Context Protocol](https://modelcontextprotocol.io/) server that renders PDFs, HTML, URLs, and images as PNG screenshots. Purpose-built for giving AI coding assistants visual feedback on rendered artifacts.
+A [Model Context Protocol](https://modelcontextprotocol.io/) server that renders PDFs, HTML, URLs, and images as screenshots. Purpose-built for giving AI coding assistants visual feedback on rendered artifacts.
 
 ## Features
 
 - **Warm browser singleton** -- Playwright Chromium stays running between requests, eliminating cold-start latency
 - **Native PDF rendering** -- Uses `pdftoppm` (poppler) for fast, accurate PDF rasterization (~100ms per page, no browser)
-- **Image passthrough** -- Direct file read for PNG, JPEG, GIF, WebP, SVG
+- **Image passthrough** -- Direct file read for PNG, JPEG, GIF, WebP
+- **JPEG screenshots** -- Browser screenshots use JPEG quality 80 for 5-10x smaller output vs PNG (same token cost)
+- **API-safe output** -- 3.5 MB output guard ensures base64 stays under the Anthropic API's 5 MB image limit
 - **Per-request isolation** -- Each browser render gets a fresh `BrowserContext`, closed in `finally`
 - **Single round-trip** -- One tool call returns the image directly in context
 
 ## Tools
 
-| Tool           | Description                       | Browser? |
-| -------------- | --------------------------------- | -------- |
-| `render_pdf`   | Render a PDF page as PNG          | No       |
-| `render_html`  | Render HTML string or file as PNG | Yes      |
-| `render_url`   | Navigate to URL and screenshot    | Yes      |
-| `render_image` | Read image file as base64         | No       |
+| Tool           | Description                        | Browser? | Format |
+| -------------- | ---------------------------------- | -------- | ------ |
+| `render_pdf`   | Render a PDF page as PNG           | No       | PNG    |
+| `render_html`  | Render HTML string or file as JPEG | Yes      | JPEG   |
+| `render_url`   | Navigate to URL and screenshot     | Yes      | JPEG   |
+| `render_image` | Read image file as base64          | No       | Native |
 
 ## Installation
 
@@ -119,7 +121,7 @@ Read an image file and return it as base64.
 | --------- | -------- | -------- | --------------------------- |
 | `path`    | `string` | required | Absolute path to image file |
 
-Supports: PNG, JPEG, GIF, WebP, SVG.
+Supports: PNG, JPEG, GIF, WebP. SVG is not supported by the Anthropic API as an image block -- use `render_html` to rasterize SVGs.
 
 ## Architecture
 
@@ -128,7 +130,7 @@ render-mcp (stdio transport)
 |-- Warm Playwright Chromium (lazy singleton, auto-reconnect)
 |-- PDF rendering via pdftoppm (no browser, ~100ms/page)
 |-- Image passthrough (direct fs.readFile + base64)
-'-- Returns: { type: "image", data: "<base64>", mimeType: "image/png" }
+'-- 3.5 MB output guard (keeps base64 under Anthropic's 5 MB API limit)
 ```
 
 Key design decisions:

@@ -15,7 +15,8 @@ export async function handleRenderUrl(
 
     const screenshot = await page.screenshot({
       fullPage,
-      type: "png",
+      type: "jpeg",
+      quality: 80,
     });
 
     const sizeError = checkOutputSize(screenshot, url);
@@ -26,7 +27,7 @@ export async function handleRenderUrl(
         {
           type: "image" as const,
           data: screenshot.toString("base64"),
-          mimeType: "image/png",
+          mimeType: "image/jpeg",
         },
       ],
     };

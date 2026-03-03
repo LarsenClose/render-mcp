@@ -14,7 +14,7 @@ export function createServer(browserManager: BrowserManager): McpServer {
 
   server.tool(
     "render_image",
-    "Read an image file and return it as base64. Supports PNG, JPEG, GIF, WebP, SVG.",
+    "Read an image file and return it as base64. Supports PNG, JPEG, GIF, WebP.",
     {
       path: z.string().describe("Absolute path to the image file"),
     },
