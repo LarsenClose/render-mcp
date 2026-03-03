@@ -119,6 +119,7 @@ describe("E2E stdio transport", () => {
         "render_html",
         "render_image",
         "render_pdf",
+        "render_pdf_smart",
         "render_url",
       ]);
     } finally {
@@ -151,6 +152,41 @@ describe("E2E stdio transport", () => {
       const content = result.content as Array<Record<string, unknown>>;
       expect(content[0].type).toBe("image");
       expect(content[0].mimeType).toBe("image/png");
+    } finally {
+      proc.stdin!.end();
+      proc.kill();
+    }
+  });
+
+  it("executes render_pdf_smart tool call", async () => {
+    const proc = spawnServer();
+
+    try {
+      await initializeServer(proc);
+
+      sendJsonRpc(proc, {
+        jsonrpc: "2.0",
+        id: 4,
+        method: "tools/call",
+        params: {
+          name: "render_pdf_smart",
+          arguments: {
+            path: resolve(ROOT, "tests/fixtures/test-multipage.pdf"),
+            mode: "hybrid",
+          },
+        },
+      });
+
+      const response = await collectResponse(proc, 30000);
+      expect(response.id).toBe(4);
+      const result = response.result as Record<string, unknown>;
+      const content = result.content as Array<Record<string, unknown>>;
+      expect(content.length).toBeGreaterThan(1);
+
+      const hasImage = content.some((b) => b.type === "image");
+      const hasText = content.some((b) => b.type === "text");
+      expect(hasImage).toBe(true);
+      expect(hasText).toBe(true);
     } finally {
       proc.stdin!.end();
       proc.kill();

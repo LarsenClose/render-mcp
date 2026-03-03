@@ -44,13 +44,14 @@ describe("MCP Server Integration", () => {
     tempFiles.length = 0;
   });
 
-  it("lists all 4 tools", async () => {
+  it("lists all 5 tools", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual([
       "render_html",
       "render_image",
       "render_pdf",
+      "render_pdf_smart",
       "render_url",
     ]);
   });
@@ -133,6 +134,51 @@ describe("MCP Server Integration", () => {
     const result = await client.callTool({
       name: "render_html",
       arguments: {},
+    });
+
+    expect(result.isError).toBe(true);
+  });
+
+  it("render_pdf_smart returns interleaved text and image content in hybrid mode", async () => {
+    const result = await client.callTool({
+      name: "render_pdf_smart",
+      arguments: {
+        path: resolve(FIXTURES, "test-multipage.pdf"),
+        mode: "hybrid",
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const content = result.content as Array<Record<string, unknown>>;
+    expect(content.length).toBeGreaterThan(1);
+
+    const hasText = content.some((b) => b.type === "text");
+    const hasImage = content.some((b) => b.type === "image");
+    expect(hasText).toBe(true);
+    expect(hasImage).toBe(true);
+  });
+
+  it("render_pdf_smart text mode returns only text blocks", async () => {
+    const result = await client.callTool({
+      name: "render_pdf_smart",
+      arguments: {
+        path: resolve(FIXTURES, "test-multipage.pdf"),
+        mode: "text",
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const content = result.content as Array<Record<string, unknown>>;
+    const allText = content.every((b) => b.type === "text");
+    const anyImage = content.some((b) => b.type === "image");
+    expect(allText).toBe(true);
+    expect(anyImage).toBe(false);
+  });
+
+  it("render_pdf_smart returns error for nonexistent file", async () => {
+    const result = await client.callTool({
+      name: "render_pdf_smart",
+      arguments: { path: "/nonexistent/file.pdf" },
     });
 
     expect(result.isError).toBe(true);

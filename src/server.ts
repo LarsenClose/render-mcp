@@ -5,6 +5,7 @@ import { handleRenderImage } from "./handlers/render-image.js";
 import { handleRenderPdf } from "./handlers/render-pdf.js";
 import { handleRenderHtml } from "./handlers/render-html.js";
 import { handleRenderUrl } from "./handlers/render-url.js";
+import { handleRenderPdfSmart } from "./handlers/render-pdf-smart.js";
 
 export function createServer(browserManager: BrowserManager): McpServer {
   const server = new McpServer({
@@ -115,6 +116,41 @@ export function createServer(browserManager: BrowserManager): McpServer {
       openWorldHint: true,
     },
     async (args) => handleRenderUrl(args, browserManager),
+  );
+
+  server.tool(
+    "render_pdf_smart",
+    "Smart PDF rendering: extracts text from prose pages and renders only pages " +
+      "with figures/diagrams as images. Far more token-efficient than rendering " +
+      "every page. Returns interleaved text and image content blocks.",
+    {
+      path: z.string().describe("Absolute path to the PDF file"),
+      pages: z
+        .string()
+        .default("all")
+        .describe(
+          'Page range: "all", single page "3", or range "1-5" (1-indexed)',
+        ),
+      dpi: z
+        .number()
+        .int()
+        .min(72)
+        .max(600)
+        .default(200)
+        .describe("Resolution for rendered pages"),
+      mode: z
+        .enum(["hybrid", "render", "text"])
+        .default("hybrid")
+        .describe(
+          "hybrid: text for prose, images for figures (default). " +
+            "render: rasterize every page. text: extract text only.",
+        ),
+    },
+    {
+      readOnlyHint: true,
+      openWorldHint: false,
+    },
+    async (args) => handleRenderPdfSmart(args),
   );
 
   return server;

@@ -77,6 +77,61 @@ export const RenderImageSchema = z.object({
 });
 export type RenderImageInput = z.infer<typeof RenderImageSchema>;
 
+export const RenderPdfSmartSchema = z.object({
+  path: z.string().describe("Absolute path to the PDF file"),
+  pages: z
+    .string()
+    .default("all")
+    .describe('Page range: "all", single page "3", or range "1-5" (1-indexed)'),
+  dpi: z
+    .number()
+    .int()
+    .min(72)
+    .max(600)
+    .default(200)
+    .describe(
+      "Resolution for rendered pages (default 200, lower than render_pdf since fewer pages are rendered)",
+    ),
+  mode: z
+    .enum(["hybrid", "render", "text"])
+    .default("hybrid")
+    .describe(
+      "hybrid: text for prose pages, images for figures (default). " +
+        "render: rasterize every page (like render_pdf). " +
+        "text: extract text only, no images.",
+    ),
+});
+export type RenderPdfSmartInput = z.infer<typeof RenderPdfSmartSchema>;
+
+/** Parse a page range string into start/end (1-indexed, inclusive). */
+export function parsePageRange(
+  pages: string,
+  totalPages: number,
+): { start: number; end: number } {
+  if (pages === "all") return { start: 1, end: totalPages };
+
+  const rangeMatch = pages.match(/^(\d+)-(\d+)$/);
+  if (rangeMatch) {
+    const start = parseInt(rangeMatch[1], 10);
+    const end = parseInt(rangeMatch[2], 10);
+    if (start < 1 || end < start || end > totalPages) {
+      throw new Error(
+        `Invalid page range "${pages}": must be within 1-${totalPages}`,
+      );
+    }
+    return { start, end };
+  }
+
+  const single = parseInt(pages, 10);
+  if (!Number.isNaN(single) && single >= 1 && single <= totalPages) {
+    return { start: single, end: single };
+  }
+
+  throw new Error(
+    `Invalid page range "${pages}": use "all", a number, or "start-end"`,
+  );
+}
+
 /** Image formats accepted by the Anthropic API as image content blocks.
  *  SVG (image/svg+xml) is intentionally excluded -- the API rejects it.
  *  Use render_html to rasterize SVGs instead. */
@@ -103,7 +158,7 @@ export const EXTENSION_TO_MIME: Record<string, string> = {
 export const MAX_OUTPUT_BYTES = 3.5 * 1024 * 1024;
 
 /** Format bytes as a human-readable string. */
-function formatBytes(bytes: number): string {
+export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
