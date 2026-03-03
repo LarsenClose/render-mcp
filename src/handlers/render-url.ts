@@ -1,5 +1,5 @@
 import type { BrowserManager } from "../browser.js";
-import { RenderUrlSchema } from "../types.js";
+import { RenderUrlSchema, checkOutputSize } from "../types.js";
 
 export async function handleRenderUrl(
   args: Record<string, unknown>,
@@ -17,6 +17,9 @@ export async function handleRenderUrl(
       fullPage,
       type: "png",
     });
+
+    const sizeError = checkOutputSize(screenshot, url);
+    if (sizeError) return sizeError;
 
     return {
       content: [

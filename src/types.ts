@@ -94,3 +94,38 @@ export const EXTENSION_TO_MIME: Record<string, string> = {
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
 };
+
+/** Maximum output size in bytes (20 MB). Buffers exceeding this are rejected
+ *  with a text error so the response never bloats the context window. */
+export const MAX_OUTPUT_BYTES = 20 * 1024 * 1024;
+
+/** Format bytes as a human-readable string. */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Check a buffer against the size limit. Returns an isError response if the
+ *  buffer is too large, or null if it's within bounds. */
+export function checkOutputSize(
+  buf: Buffer,
+  source: string,
+): {
+  content: [{ type: "text"; text: string }];
+  isError: true;
+} | null {
+  if (buf.length <= MAX_OUTPUT_BYTES) return null;
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text:
+          `Output too large: ${formatBytes(buf.length)} exceeds the ` +
+          `${formatBytes(MAX_OUTPUT_BYTES)} limit. Source: ${source}. ` +
+          `Try reducing DPI, viewport size, or disabling fullPage.`,
+      },
+    ],
+    isError: true,
+  };
+}

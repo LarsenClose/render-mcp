@@ -1,6 +1,6 @@
 import { pathToFileURL } from "node:url";
 import type { BrowserManager } from "../browser.js";
-import { RenderHtmlSchema } from "../types.js";
+import { RenderHtmlSchema, checkOutputSize } from "../types.js";
 
 export async function handleRenderHtml(
   args: Record<string, unknown>,
@@ -25,6 +25,10 @@ export async function handleRenderHtml(
       fullPage,
       type: "png",
     });
+
+    const source = parsed.html != null ? "HTML string" : parsed.path!;
+    const sizeError = checkOutputSize(screenshot, source);
+    if (sizeError) return sizeError;
 
     return {
       content: [
