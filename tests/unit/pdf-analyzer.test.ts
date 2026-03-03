@@ -31,7 +31,7 @@ describe("analyzePdf", () => {
     expect(classifications).toHaveLength(1);
     expect(classifications[0].pageNum).toBe(3);
     expect(classifications[0].type).toBe("render");
-    expect(classifications[0].reason).toMatch(/vector paths/);
+    expect(classifications[0].reason).toMatch(/path complexity/);
   });
 
   it("returns correct totalPages count", async () => {

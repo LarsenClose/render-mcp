@@ -1,0 +1,5 @@
+Total pages: 4
+Page 1: text (text-only page) [1155 chars]
+Page 2: render (1 embedded image(s)) [634 chars]
+Page 3: render (path complexity 224 (likely diagram)) [598 chars]
+Page 4: text (text-only page) [751 chars]

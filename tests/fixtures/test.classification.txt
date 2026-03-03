@@ -1,0 +1,2 @@
+Total pages: 1
+Page 1: render (minimal text (9 chars)) [9 chars]

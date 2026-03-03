@@ -2,11 +2,14 @@ import { readFile } from "node:fs/promises";
 import { getDocument, OPS } from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 
-/** Threshold: pages with more than this many constructPath ops likely contain
- *  diagrams, charts, or other vector graphics worth rendering. Even simple
- *  diagrams (3-4 boxes with arrows) produce 20+ path ops, while pure text
- *  pages typically have 0. Conservative: prefer rendering over missing visuals. */
-const VECTOR_PATH_THRESHOLD = 15;
+/** Threshold for vector path sub-operation complexity. Each constructPath op
+ *  contains geometry entries (moveTo coords, lineTo coords, curveTo control
+ *  points, etc.). A horizontal rule scores ~6, a simple box ~13, while a
+ *  commutative diagram with arrows scores 200-1200. Decorative elements
+ *  (borders, underlines) typically stay under 50. Threshold of 100 cleanly
+ *  separates diagrams from decoration across tested LaTeX, arxiv, and
+ *  general PDFs. */
+const PATH_COMPLEXITY_THRESHOLD = 100;
 
 /** Pages with fewer characters than this are likely full-page figures or
  *  mostly-blank separator pages. */
@@ -39,11 +42,20 @@ async function classifyPage(page: PDFPageProxy): Promise<PageClassification> {
     .trim();
 
   let imageCount = 0;
-  let pathCount = 0;
+  let pathComplexity = 0;
 
-  for (const fn of ops.fnArray) {
-    if (IMAGE_OPS.has(fn)) imageCount++;
-    if (fn === OPS.constructPath) pathCount++;
+  for (let i = 0; i < ops.fnArray.length; i++) {
+    if (IMAGE_OPS.has(ops.fnArray[i])) imageCount++;
+    if (ops.fnArray[i] === OPS.constructPath) {
+      // Each constructPath op stores geometry data in argsArray[i][1][0].
+      // When non-null, this object contains indexed coordinate entries —
+      // more entries means more complex geometry (curves, multi-segment
+      // paths). Null entries are stroke/fill ops with no new geometry.
+      const geom = (ops.argsArray[i] as unknown[][])?.[1]?.[0];
+      if (geom !== null && geom !== undefined) {
+        pathComplexity += Object.keys(geom as object).length;
+      }
+    }
   }
 
   const pageNum = page.pageNumber;
@@ -66,11 +78,11 @@ async function classifyPage(page: PDFPageProxy): Promise<PageClassification> {
     };
   }
 
-  if (pathCount > VECTOR_PATH_THRESHOLD) {
+  if (pathComplexity > PATH_COMPLEXITY_THRESHOLD) {
     return {
       pageNum,
       type: "render",
-      reason: `${pathCount} vector paths (likely diagram)`,
+      reason: `path complexity ${pathComplexity} (likely diagram)`,
       textContent: text,
     };
   }
