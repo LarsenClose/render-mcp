@@ -132,15 +132,42 @@ export function parsePageRange(
   );
 }
 
+export const RenderSvgSchema = z
+  .object({
+    svg: z.string().optional().describe("SVG string to render"),
+    path: z
+      .string()
+      .optional()
+      .describe("Absolute path to an SVG file to render"),
+    width: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Output width in pixels (default 800)"),
+    height: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        "Output height in pixels (auto-calculated from aspect ratio if omitted)",
+      ),
+  })
+  .refine((data) => (data.svg != null) !== (data.path != null), {
+    message: "Exactly one of 'svg' or 'path' must be provided",
+  });
+export type RenderSvgInput = z.infer<typeof RenderSvgSchema>;
+
 /** Image formats accepted by the Anthropic API as image content blocks.
- *  SVG (image/svg+xml) is intentionally excluded -- the API rejects it.
- *  Use render_html to rasterize SVGs instead. */
+ *  SVG files are rasterized to PNG via resvg before returning. */
 export const SUPPORTED_IMAGE_EXTENSIONS = new Set([
   ".png",
   ".jpg",
   ".jpeg",
   ".gif",
   ".webp",
+  ".svg",
 ]);
 
 export const EXTENSION_TO_MIME: Record<string, string> = {
@@ -149,6 +176,7 @@ export const EXTENSION_TO_MIME: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".gif": "image/gif",
   ".webp": "image/webp",
+  ".svg": "image/png",
 };
 
 /** Maximum output size in bytes. The Anthropic API rejects base64 image

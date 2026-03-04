@@ -44,7 +44,7 @@ describe("MCP Server Integration", () => {
     tempFiles.length = 0;
   });
 
-  it("lists all 5 tools", async () => {
+  it("lists all 6 tools", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual([
@@ -52,6 +52,7 @@ describe("MCP Server Integration", () => {
       "render_image",
       "render_pdf",
       "render_pdf_smart",
+      "render_svg",
       "render_url",
     ]);
   });
@@ -119,6 +120,33 @@ describe("MCP Server Integration", () => {
     const block = (result.content as Array<Record<string, unknown>>)[0];
     expect(block.type).toBe("image");
     expect(block.mimeType).toBe("image/jpeg");
+  });
+
+  it("render_svg with SVG string returns PNG image content", async () => {
+    const result = await client.callTool({
+      name: "render_svg",
+      arguments: {
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="red"/></svg>',
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(result.content).toHaveLength(1);
+    const block = (result.content as Array<Record<string, unknown>>)[0];
+    expect(block.type).toBe("image");
+    expect(block.mimeType).toBe("image/png");
+  });
+
+  it("render_svg with file path returns PNG image content", async () => {
+    const result = await client.callTool({
+      name: "render_svg",
+      arguments: { path: resolve(FIXTURES, "test.svg") },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const block = (result.content as Array<Record<string, unknown>>)[0];
+    expect(block.type).toBe("image");
+    expect(block.mimeType).toBe("image/png");
   });
 
   it("returns error for nonexistent image file", async () => {
@@ -212,16 +240,16 @@ describe("MCP Server Integration", () => {
       expect(block.text).toContain("too large");
     });
 
-    it("returns error for SVG files with helpful message", async () => {
+    it("render_image with SVG file returns PNG", async () => {
       const result = await client.callTool({
         name: "render_image",
-        arguments: { path: "/tmp/test.svg" },
+        arguments: { path: resolve(FIXTURES, "test.svg") },
       });
 
-      expect(result.isError).toBe(true);
+      expect(result.isError).toBeFalsy();
       const block = (result.content as Array<Record<string, unknown>>)[0];
-      expect(block.type).toBe("text");
-      expect(block.text).toContain("render_html");
+      expect(block.type).toBe("image");
+      expect(block.mimeType).toBe("image/png");
     });
 
     it("small images pass through as image blocks, not text", async () => {

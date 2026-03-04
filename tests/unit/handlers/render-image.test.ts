@@ -27,10 +27,18 @@ describe("handleRenderImage", () => {
     );
   });
 
-  it("throws on SVG with helpful message", async () => {
-    await expect(handleRenderImage({ path: "/tmp/icon.svg" })).rejects.toThrow(
-      /Use render_html to rasterize SVGs/,
-    );
+  it("renders SVG files as PNG via resvg", async () => {
+    const result = await handleRenderImage({
+      path: resolve(FIXTURES, "test.svg"),
+    });
+
+    expect(result.content).toHaveLength(1);
+    expect(result.content[0].type).toBe("image");
+    expect(result.content[0].mimeType).toBe("image/png");
+    // Verify PNG magic bytes
+    const buf = Buffer.from(result.content[0].data, "base64");
+    expect(buf[0]).toBe(0x89);
+    expect(buf[1]).toBe(0x50);
   });
 
   it("throws on file not found", async () => {

@@ -6,6 +6,7 @@ import { handleRenderPdf } from "./handlers/render-pdf.js";
 import { handleRenderHtml } from "./handlers/render-html.js";
 import { handleRenderUrl } from "./handlers/render-url.js";
 import { handleRenderPdfSmart } from "./handlers/render-pdf-smart.js";
+import { handleRenderSvg } from "./handlers/render-svg.js";
 
 export function createServer(browserManager: BrowserManager): McpServer {
   const server = new McpServer({
@@ -15,7 +16,7 @@ export function createServer(browserManager: BrowserManager): McpServer {
 
   server.tool(
     "render_image",
-    "Read an image file and return it as base64. Supports PNG, JPEG, GIF, WebP.",
+    "Read an image file and return it as base64. Supports PNG, JPEG, GIF, WebP, SVG.",
     {
       path: z.string().describe("Absolute path to the image file"),
     },
@@ -151,6 +152,37 @@ export function createServer(browserManager: BrowserManager): McpServer {
       openWorldHint: false,
     },
     async (args) => handleRenderPdfSmart(args),
+  );
+
+  server.tool(
+    "render_svg",
+    "Render an SVG string or file as a PNG image using resvg. No browser needed.",
+    {
+      svg: z.string().optional().describe("SVG string to render"),
+      path: z
+        .string()
+        .optional()
+        .describe("Absolute path to an SVG file to render"),
+      width: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("Output width in pixels (default 800)"),
+      height: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          "Output height in pixels (auto-calculated from aspect ratio if omitted)",
+        ),
+    },
+    {
+      readOnlyHint: true,
+      openWorldHint: false,
+    },
+    async (args) => handleRenderSvg(args),
   );
 
   return server;

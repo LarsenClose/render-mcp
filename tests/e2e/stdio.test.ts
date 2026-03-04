@@ -120,6 +120,7 @@ describe("E2E stdio transport", () => {
         "render_image",
         "render_pdf",
         "render_pdf_smart",
+        "render_svg",
         "render_url",
       ]);
     } finally {
@@ -148,6 +149,36 @@ describe("E2E stdio transport", () => {
 
       const response = await collectResponse(proc);
       expect(response.id).toBe(3);
+      const result = response.result as Record<string, unknown>;
+      const content = result.content as Array<Record<string, unknown>>;
+      expect(content[0].type).toBe("image");
+      expect(content[0].mimeType).toBe("image/png");
+    } finally {
+      proc.stdin!.end();
+      proc.kill();
+    }
+  });
+
+  it("executes render_svg tool call", async () => {
+    const proc = spawnServer();
+
+    try {
+      await initializeServer(proc);
+
+      sendJsonRpc(proc, {
+        jsonrpc: "2.0",
+        id: 5,
+        method: "tools/call",
+        params: {
+          name: "render_svg",
+          arguments: {
+            svg: '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="red"/></svg>',
+          },
+        },
+      });
+
+      const response = await collectResponse(proc);
+      expect(response.id).toBe(5);
       const result = response.result as Record<string, unknown>;
       const content = result.content as Array<Record<string, unknown>>;
       expect(content[0].type).toBe("image");
